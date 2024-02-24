@@ -61,6 +61,10 @@ def direct_link_generator(link):
         return streamvid(link)
     elif 'shrdsk.me' in domain:
         return shrdsk(link)
+    elif 'tmpsend.com' in domain:
+        return tmpsend(link)
+    elif 'qiwi.gg' in domain:
+        return qiwi(link)
     elif any(x in domain for x in ['e.pcloud.link', 'u.pcloud.link']):
         return pcloud(link)
     elif any(x in domain for x in ['akmfiles.com', 'akmfls.xyz']):
@@ -189,7 +193,7 @@ def onedrive(link):
             parsed_link = urlparse(link)
             link_data = parse_qs(parsed_link.query)
         except Exception as e:
-            raise DirectDownloadLinkException(f"ERROR: {e.__class__.__name__}")
+            raise DirectDownloadLinkException(f"ERROR: {e.__class__.__name__}") from e
         if not link_data:
             raise DirectDownloadLinkException("ERROR: Unable to find link_data")
         folder_id = link_data.get('resid')
@@ -736,7 +740,7 @@ def gofile(url):
             raise e
 
     def __fetch_links(session, _id, folderPath=''):
-        _url = f"https://api.gofile.io/getContent?contentId={_id}&token={token}&websiteToken=7fd94ds12fds4&cache=true"
+        _url = f"https://api.gofile.io/getContent?contentId={_id}&token={token}&wt=4fd6sg89d7s6&cache=true"
         if _password:
             _url += f"&password={_password}"
         try:
@@ -1235,3 +1239,35 @@ def pcloud(url):
     if link := findall(r'.downloadlink.:..(https:.*)..', res.text):
         return link[0].replace('\/', '/')
     raise DirectDownloadLinkException("ERROR: Direct link not found")
+
+def tmpsend(url):
+    parsed_url = urlparse(url)
+    if any(x in parsed_url.path for x in ['thank-you','download']):
+        query_params = parse_qs(parsed_url.query)
+        if file_id := query_params.get('d'):
+            file_id = file_id[0]
+    elif not (file_id := parsed_url.path.strip('/')):
+
+
+        raise DirectDownloadLinkException("ERROR: Invalid URL format")
+    referer_url = f"https://tmpsend.com/thank-you?d={file_id}"
+    header = f"Referer: {referer_url}"
+    download_link = f"https://tmpsend.com/download?d={file_id}"
+    return download_link, header
+
+def qiwi(url):
+    """qiwi.gg link generator
+    based on https://github.com/aenulrofik"""
+    with Session() as session:
+        file_id = url.split("/")[-1]
+        try:
+            res = session.get(url).text
+        except Exception as e:
+            raise DirectDownloadLinkException(f"ERROR: {e.__class__.__name__}") from e
+        tree = HTML(res)
+        if name := tree.xpath('//h1[@class="page_TextHeading__VsM7r"]/text()'):
+
+            ext = name[0].split('.')[-1]
+            return f"https://qiwi.lol/{file_id}.{ext}"
+        else:
+            raise DirectDownloadLinkException("ERROR: File not found")
